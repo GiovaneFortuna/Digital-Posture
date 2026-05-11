@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class LoginForm extends StatefulWidget {
-  const LoginForm({Key? key}) : super(key: key);
+  const LoginForm({super.key});
 
   @override
   State<LoginForm> createState() => _LoginFormState();
@@ -156,9 +156,7 @@ class _LoginFormState extends State<LoginForm> {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
-                onPressed: () {
-                  // TODO: Implementar recuperação de senha
-                },
+                onPressed: () {},
                 child: const Text(
                   'Esqueceu a senha?',
                   style: TextStyle(color: Color(0xFF00897B), fontSize: 13),

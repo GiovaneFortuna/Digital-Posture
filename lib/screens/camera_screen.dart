@@ -90,6 +90,7 @@ class _CameraScreenState extends State<CameraScreen> {
       child: Container(
         width: 2,
         height: double.infinity,
+        // ignore: deprecated_member_use
         color: Colors.red.shade300.withOpacity(0.5), // Linha de prumo para TCC
       ),
     );

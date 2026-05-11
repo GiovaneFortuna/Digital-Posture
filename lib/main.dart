@@ -1,4 +1,8 @@
 import 'package:digital_posture/screens/camera_screen.dart';
+import 'package:digital_posture/screens/registro_de_paciente_screen.dart';
+import 'package:digital_posture/screens/checklist_screen.dart';
+import 'package:digital_posture/screens/whatsapp_screen.dart';
+import 'package:digital_posture/screens/lembretes_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -47,27 +51,24 @@ class DigitalPostureApp extends StatelessWidget {
         '/auth': (context) => const ScreenOne(),
         '/home': (context) => const ProtectedRoute(child: HomeScreen()),
         '/camera': (context) => const ProtectedRoute(child: CameraScreen()),
+        '/cadastro': (context) =>
+            const ProtectedRoute(child: RegistroDePacienteScreen()),
+        '/checklist': (context) =>
+            const ProtectedRoute(child: ChecklistScreen()),
+        '/whatsapp': (context) => const ProtectedRoute(child: WhatsAppScreen()),
+        '/lembretes': (context) =>
+            const ProtectedRoute(child: LembretesScreen()),
 
         // Outras rotas em desenvolvimento
-        '/cadastro': (context) => const ProtectedRoute(
-          child: PlaceholderScreen(title: 'Cadastro de Paciente'),
-        ),
-        '/checklist': (context) => const ProtectedRoute(
-          child: PlaceholderScreen(title: 'Checklist Digital'),
-        ),
         '/analise': (context) => const ProtectedRoute(
           child: PlaceholderScreen(title: 'Análise com IA'),
         ),
-        '/lembretes': (context) =>
-            const ProtectedRoute(child: PlaceholderScreen(title: 'Lembretes')),
-        '/whatsapp': (context) =>
-            const ProtectedRoute(child: PlaceholderScreen(title: 'WhatsApp')),
       },
     );
   }
 }
 
-// --- LÓGICA DE VERIFICAÇÃO DE LOGIN CORRIGIDA ---
+// --- LÓGICA DE VERIFICAÇÃO DE LOGIN ---
 
 class InitialRouteHandler extends StatefulWidget {
   const InitialRouteHandler({super.key});
@@ -84,16 +85,12 @@ class _InitialRouteHandlerState extends State<InitialRouteHandler> {
   }
 
   Future<void> _checkAuthentication() async {
-    // Pequeno delay para garantir que a árvore de widgets esteja pronta
     await Future.delayed(const Duration(milliseconds: 500));
     final prefs = await SharedPreferences.getInstance();
     final userStr = prefs.getString('user');
 
     if (!mounted) return;
 
-    // CORREÇÃO DO FORMATEXCEPTION:
-    // Se o que estiver salvo for a palavra "logado" (sem chaves de JSON),
-    // consideramos inválido e limpamos para evitar o erro de parser.
     if (userStr != null && userStr.contains('{')) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
@@ -109,7 +106,7 @@ class _InitialRouteHandlerState extends State<InitialRouteHandler> {
   }
 }
 
-// --- PROTEÇÃO DE ROTAS CORRIGIDA ---
+// --- PROTEÇÃO DE ROTAS ---
 
 class ProtectedRoute extends StatefulWidget {
   final Widget child;
@@ -135,13 +132,11 @@ class _ProtectedRouteState extends State<ProtectedRoute> {
 
     if (mounted) {
       setState(() {
-        // Só autentica se houver uma string que pareça um JSON
         _isAuthenticated = userStr != null && userStr.contains('{');
         _isLoading = false;
       });
 
       if (!_isAuthenticated) {
-        // Limpa o SharedPreferences se houver lixo lá
         await prefs.remove('user');
         Navigator.pushReplacementNamed(context, '/auth');
       }
