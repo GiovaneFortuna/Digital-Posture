@@ -138,6 +138,7 @@ class _ProtectedRouteState extends State<ProtectedRoute> {
 
       if (!_isAuthenticated) {
         await prefs.remove('user');
+        // ignore: use_build_context_synchronously
         Navigator.pushReplacementNamed(context, '/auth');
       }
     }
