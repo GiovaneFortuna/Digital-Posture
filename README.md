@@ -1,4 +1,4 @@
-# digital_posture
+# Digital_posture
 
 A new Flutter project.
 
