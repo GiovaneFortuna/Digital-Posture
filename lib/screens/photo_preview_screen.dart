@@ -67,7 +67,6 @@ class PhotoPreviewScreen extends StatelessWidget {
                 // Botão: Usar foto / Enviar para análise
                 ElevatedButton.icon(
                   onPressed: () {
-                    // TODO: Aqui você passa o imagePath para a sua IA ou salva
                     // Exemplo: Navigator.pushNamed(context, '/analise', arguments: imagePath);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(

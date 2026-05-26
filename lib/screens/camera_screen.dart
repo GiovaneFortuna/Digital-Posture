@@ -1,6 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import '../main.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'photo_preview_screen.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -14,6 +14,7 @@ class _CameraScreenState extends State<CameraScreen> {
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
   bool _isTakingPicture = false;
+  bool _permissaoNegada = false;
 
   @override
   void initState() {
@@ -21,16 +22,42 @@ class _CameraScreenState extends State<CameraScreen> {
     _setupCamera();
   }
 
-  void _setupCamera() {
-    if (cameras.isNotEmpty) {
-      _controller = CameraController(
-        cameras[0],
-        ResolutionPreset.high,
-        enableAudio: false,
-      );
-      _initializeControllerFuture = _controller!.initialize();
-    } else {
-      debugPrint('Nenhuma câmera encontrada no dispositivo.');
+  Future<void> _setupCamera() async {
+    // Pede permissão em tempo de execução
+    final status = await Permission.camera.request();
+
+    if (!status.isGranted) {
+      if (mounted) {
+        setState(() => _permissaoNegada = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Permissão de câmera negada!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Recarrega as câmeras disponíveis
+    final camerasList = await availableCameras();
+
+    if (camerasList.isEmpty) {
+      debugPrint('Nenhuma câmera encontrada.');
+      if (mounted) setState(() => _permissaoNegada = true);
+      return;
+    }
+
+    _controller = CameraController(
+      camerasList[0],
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
+
+    if (mounted) {
+      setState(() {
+        _initializeControllerFuture = _controller!.initialize();
+      });
     }
   }
 
@@ -51,7 +78,6 @@ class _CameraScreenState extends State<CameraScreen> {
 
       if (!mounted) return;
 
-      // Navega para a tela de preview passando o caminho da foto
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -82,12 +108,53 @@ class _CameraScreenState extends State<CameraScreen> {
         backgroundColor: const Color(0xFF00897B),
         foregroundColor: Colors.white,
       ),
-      body: cameras.isEmpty
-          ? const Center(
-              child: Text(
-                'Nenhuma câmera disponível',
-                style: TextStyle(color: Colors.white),
+      body: _permissaoNegada
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.camera_alt_outlined,
+                    color: Colors.white54,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Permissão de câmera necessária',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Vá em Configurações e permita o acesso à câmera',
+                    style: TextStyle(color: Colors.white54, fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() => _permissaoNegada = false);
+                      _setupCamera();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00897B),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('Tentar novamente'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => openAppSettings(),
+                    child: const Text(
+                      'Abrir configurações',
+                      style: TextStyle(color: Color(0xFF00897B)),
+                    ),
+                  ),
+                ],
               ),
+            )
+          : _initializeControllerFuture == null
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF00897B)),
             )
           : FutureBuilder<void>(
               future: _initializeControllerFuture,
@@ -114,12 +181,11 @@ class _CameraScreenState extends State<CameraScreen> {
                     // Preview da câmera ocupando toda a tela
                     Positioned.fill(child: CameraPreview(_controller!)),
 
-                    // Linha de prumo vertical (para análise postural)
+                    // Linha de prumo vertical
                     Center(
                       child: Container(
                         width: 1.5,
                         height: double.infinity,
-                        // ignore: deprecated_member_use
                         color: Colors.red.withOpacity(0.6),
                       ),
                     ),
@@ -151,14 +217,16 @@ class _CameraScreenState extends State<CameraScreen> {
               },
             ),
 
-      // Botão de captura centralizado
-      floatingActionButton: FloatingActionButton.large(
-        onPressed: _isTakingPicture ? null : _takePicture,
-        backgroundColor: const Color(0xFF00897B),
-        child: _isTakingPicture
-            ? const CircularProgressIndicator(color: Colors.white)
-            : const Icon(Icons.camera_alt, color: Colors.white, size: 36),
-      ),
+      floatingActionButton:
+          _permissaoNegada || _initializeControllerFuture == null
+          ? null
+          : FloatingActionButton.large(
+              onPressed: _isTakingPicture ? null : _takePicture,
+              backgroundColor: const Color(0xFF00897B),
+              child: _isTakingPicture
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Icon(Icons.camera_alt, color: Colors.white, size: 36),
+            ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }

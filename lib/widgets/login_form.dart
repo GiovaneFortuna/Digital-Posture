@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -13,7 +12,8 @@ class _LoginFormState extends State<LoginForm> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _obscurePassword = true; // ← NOVO: controla visibilidade da senha
+  bool _obscurePassword = true;
+  bool _estaCarregando = false;
 
   @override
   void dispose() {
@@ -23,14 +23,43 @@ class _LoginFormState extends State<LoginForm> {
   }
 
   Future<void> _handleLogin() async {
-    if (_formKey.currentState!.validate()) {
-      final prefs = await SharedPreferences.getInstance();
-      final user = {'email': _emailController.text, 'type': 'professional'};
-      await prefs.setString('user', jsonEncode(user));
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _estaCarregando = true);
+
+    try {
+      final response = await Supabase.instance.client.auth.signInWithPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (response.user == null) {
+        throw Exception('Usuário não encontrado');
+      }
 
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/home');
       }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('E-mail ou senha incorretos: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao entrar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _estaCarregando = false);
     }
   }
 
@@ -45,7 +74,6 @@ class _LoginFormState extends State<LoginForm> {
           children: [
             const SizedBox(height: 16),
 
-            // Label E-mail
             const Text(
               'E-mail',
               style: TextStyle(
@@ -56,7 +84,6 @@ class _LoginFormState extends State<LoginForm> {
             ),
             const SizedBox(height: 8),
 
-            // Campo E-mail
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
@@ -92,7 +119,6 @@ class _LoginFormState extends State<LoginForm> {
 
             const SizedBox(height: 16),
 
-            // Label Senha
             const Text(
               'Senha',
               style: TextStyle(
@@ -103,24 +129,19 @@ class _LoginFormState extends State<LoginForm> {
             ),
             const SizedBox(height: 8),
 
-            // Campo Senha
             TextFormField(
               controller: _passwordController,
-              obscureText:
-                  _obscurePassword, // ← ALTERADO: usa a variável de estado
+              obscureText: _obscurePassword,
               decoration: InputDecoration(
                 hintText: '••••••••',
                 prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
-                // ← NOVO: botão para mostrar/ocultar senha
                 suffixIcon: IconButton(
                   icon: Icon(
                     _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     color: Colors.grey,
                   ),
                   onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
+                    setState(() => _obscurePassword = !_obscurePassword);
                   },
                 ),
                 filled: true,
@@ -152,7 +173,6 @@ class _LoginFormState extends State<LoginForm> {
 
             const SizedBox(height: 8),
 
-            // Link Esqueceu a senha
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -166,9 +186,8 @@ class _LoginFormState extends State<LoginForm> {
 
             const SizedBox(height: 16),
 
-            // Botão Entrar
             ElevatedButton(
-              onPressed: _handleLogin,
+              onPressed: _estaCarregando ? null : _handleLogin,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00897B),
                 foregroundColor: Colors.white,
@@ -178,10 +197,22 @@ class _LoginFormState extends State<LoginForm> {
                 ),
                 elevation: 2,
               ),
-              child: const Text(
-                'Entrar',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+              child: _estaCarregando
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Entrar',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ],
         ),

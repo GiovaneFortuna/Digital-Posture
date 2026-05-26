@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SignupForm extends StatefulWidget {
   const SignupForm({super.key});
@@ -19,6 +18,7 @@ class _SignupFormState extends State<SignupForm> {
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _estaCarregando = false;
 
   @override
   void dispose() {
@@ -31,24 +31,40 @@ class _SignupFormState extends State<SignupForm> {
   }
 
   Future<void> _handleSignup() async {
-    if (_formKey.currentState!.validate()) {
-      if (_passwordController.text != _confirmPasswordController.text) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('As senhas não coincidem!'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('As senhas não coincidem!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _estaCarregando = true);
+
+    try {
+      // 1. Cria o usuário no Supabase Auth
+      final response = await Supabase.instance.client.auth.signUp(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      final user = response.user;
+
+      if (user == null) {
+        throw Exception('Erro ao criar usuário');
       }
 
-      final prefs = await SharedPreferences.getInstance();
-      final user = {
-        'name': _nameController.text,
-        'email': _emailController.text,
-        'type': 'professional',
-      };
-      await prefs.setString('user', jsonEncode(user));
+      // 2. Salva os dados extras na tabela profissionais
+      await Supabase.instance.client.from('profissionais').insert({
+        'id': user.id,
+        'name': _nameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'profissao': _professionController.text.trim(),
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -59,6 +75,23 @@ class _SignupFormState extends State<SignupForm> {
         );
         Navigator.pushReplacementNamed(context, '/home');
       }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro de autenticação: ${e.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _estaCarregando = false);
     }
   }
 
@@ -73,45 +106,12 @@ class _SignupFormState extends State<SignupForm> {
           children: [
             const SizedBox(height: 16),
 
-            // Label Nome Completo
-            const Text(
-              'Nome Completo',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            _buildLabel('Nome Completo'),
             const SizedBox(height: 8),
-
-            // Campo Nome Completo
-            TextFormField(
+            _buildTextField(
               controller: _nameController,
-              decoration: InputDecoration(
-                hintText: 'Seu nome completo',
-                prefixIcon: const Icon(
-                  Icons.person_outline,
-                  color: Colors.grey,
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00897B)),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-              ),
+              hint: 'Seu nome completo',
+              icon: Icons.person_outline,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Por favor, insira seu nome';
@@ -122,46 +122,19 @@ class _SignupFormState extends State<SignupForm> {
 
             const SizedBox(height: 16),
 
-            // Label E-mail
-            const Text(
-              'E-mail',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            _buildLabel('E-mail'),
             const SizedBox(height: 8),
-
-            // Campo E-mail
-            TextFormField(
+            _buildTextField(
               controller: _emailController,
+              hint: 'seu@email.com',
+              icon: Icons.mail_outline,
               keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                hintText: 'seu@email.com',
-                prefixIcon: const Icon(Icons.mail_outline, color: Colors.grey),
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00897B)),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Por favor, insira seu e-mail';
+                }
+                if (!value.contains('@')) {
+                  return 'E-mail inválido';
                 }
                 return null;
               },
@@ -169,41 +142,12 @@ class _SignupFormState extends State<SignupForm> {
 
             const SizedBox(height: 16),
 
-            // Label Profissão
-            const Text(
-              'Profissão',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            _buildLabel('Profissão'),
             const SizedBox(height: 8),
-
-            // Campo Profissão
-            TextFormField(
+            _buildTextField(
               controller: _professionController,
-              decoration: InputDecoration(
-                hintText: 'Ex: Fisioterapeuta, Educador Físico',
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00897B)),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-              ),
+              hint: 'Ex: Fisioterapeuta, Educador Físico',
+              icon: Icons.work_outline,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Por favor, insira sua profissão';
@@ -214,54 +158,14 @@ class _SignupFormState extends State<SignupForm> {
 
             const SizedBox(height: 16),
 
-            // Label Senha
-            const Text(
-              'Senha',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            _buildLabel('Senha'),
             const SizedBox(height: 8),
-
-            // Campo Senha
-            TextFormField(
+            _buildPasswordField(
               controller: _passwordController,
-              obscureText: _obscurePassword,
-              decoration: InputDecoration(
-                hintText: 'Mínimo 8 caracteres',
-                prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.grey,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00897B)),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
-              ),
+              hint: 'Mínimo 8 caracteres',
+              obscure: _obscurePassword,
+              onToggle: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Por favor, insira uma senha';
@@ -275,59 +179,21 @@ class _SignupFormState extends State<SignupForm> {
 
             const SizedBox(height: 16),
 
-            // Label Confirmar Senha
-            const Text(
-              'Confirmar Senha',
-              style: TextStyle(
-                color: Colors.black87,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            _buildLabel('Confirmar Senha'),
             const SizedBox(height: 8),
-
-            // Campo Confirmar Senha
-            TextFormField(
+            _buildPasswordField(
               controller: _confirmPasswordController,
-              obscureText: _obscureConfirmPassword,
-              decoration: InputDecoration(
-                hintText: 'Digite a senha novamente',
-                prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureConfirmPassword
-                        ? Icons.visibility_off
-                        : Icons.visibility,
-                    color: Colors.grey,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                    });
-                  },
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Color(0xFF00897B)),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 16,
-                ),
+              hint: 'Digite a senha novamente',
+              obscure: _obscureConfirmPassword,
+              onToggle: () => setState(
+                () => _obscureConfirmPassword = !_obscureConfirmPassword,
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Por favor, confirme sua senha';
+                }
+                if (value != _passwordController.text) {
+                  return 'As senhas não coincidem';
                 }
                 return null;
               },
@@ -335,9 +201,8 @@ class _SignupFormState extends State<SignupForm> {
 
             const SizedBox(height: 24),
 
-            // Botão Criar Conta
             ElevatedButton(
-              onPressed: _handleSignup,
+              onPressed: _estaCarregando ? null : _handleSignup,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00897B),
                 foregroundColor: Colors.white,
@@ -347,14 +212,118 @@ class _SignupFormState extends State<SignupForm> {
                 ),
                 elevation: 2,
               ),
-              child: const Text(
-                'Criar Conta',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+              child: _estaCarregando
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Criar Conta',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
+
+            const SizedBox(height: 24),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLabel(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Colors.black87,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(icon, color: Colors.grey),
+        filled: true,
+        fillColor: Colors.grey[100],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF00897B)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String hint,
+    required bool obscure,
+    required VoidCallback onToggle,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: const Icon(Icons.lock_outline, color: Colors.grey),
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscure ? Icons.visibility_off : Icons.visibility,
+            color: Colors.grey,
+          ),
+          onPressed: onToggle,
+        ),
+        filled: true,
+        fillColor: Colors.grey[100],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF00897B)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
+      validator: validator,
     );
   }
 }

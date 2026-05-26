@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Import do Supabase
 
 class RegistroDePacienteScreen extends StatefulWidget {
   const RegistroDePacienteScreen({super.key});
@@ -19,7 +18,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
   final TextEditingController _alturaController = TextEditingController();
 
   String? _sexoSelecionado;
-  double? _imc;
+  bool _estaCarregando = false; // Para mostrar um indicador de progresso
 
   @override
   void dispose() {
@@ -31,60 +30,59 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
     super.dispose();
   }
 
-  void _calcularIMC() {
-    if (_pesoController.text.isNotEmpty && _alturaController.text.isNotEmpty) {
-      final peso = double.tryParse(_pesoController.text);
-      final altura = double.tryParse(_alturaController.text);
-
-      if (peso != null && altura != null && altura > 0) {
-        setState(() {
-          _imc = peso / ((altura / 100) * (altura / 100));
-        });
-      }
-    } else {
-      setState(() {
-        _imc = null;
-      });
-    }
-  }
-
   Future<void> _salvarPaciente() async {
-    if (_formKey.currentState!.validate()) {
-      if (_sexoSelecionado == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor, selecione o sexo'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
+    if (!_formKey.currentState!.validate()) return;
 
-      final paciente = {
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+    if (_sexoSelecionado == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, selecione o sexo'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _estaCarregando = true;
+    });
+
+    try {
+      // Envia os dados diretamente para a tabela 'pacientes' no Supabase
+      await Supabase.instance.client.from('pacientes').insert({
         'name': _nomeController.text,
-        'phone': _telefoneController.text,
-        'idade': _idadeController.text,
+        'telefone': _telefoneController.text,
+        'idade':
+            int.tryParse(_idadeController.text) ??
+            0, // Garante que envia como número se o banco exigir
         'sexo': _sexoSelecionado,
-        'peso': _pesoController.text,
-        'altura': _alturaController.text,
-        'imc': _imc?.toStringAsFixed(1),
-        'dataCadastro': DateTime.now().toIso8601String(),
-      };
-
-      final prefs = await SharedPreferences.getInstance();
-      List<String> pacientes = prefs.getStringList('pacientes') ?? [];
-      pacientes.add(jsonEncode(paciente));
-      await prefs.setStringList('pacientes', pacientes);
+        'peso': double.tryParse(_pesoController.text) ?? 0.0,
+        'altura': int.tryParse(_alturaController.text) ?? 0,
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Paciente cadastrado com sucesso!'),
+            content: Text('Paciente cadastrado com sucesso no Supabase!'),
             backgroundColor: Color(0xFF00897B),
           ),
         );
         Navigator.pop(context);
+      }
+    } catch (erro) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao salvar no banco: $erro'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _estaCarregando = false;
+        });
       }
     }
   }
@@ -354,9 +352,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                                       ],
                                     ),
                                   ),
-
                                   const SizedBox(width: 16),
-
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -412,10 +408,6 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                                             DropdownMenuItem(
                                               value: 'feminino',
                                               child: Text('Feminino'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'outro',
-                                              child: Text('Outro'),
                                             ),
                                           ],
                                           onChanged: (value) {
@@ -486,7 +478,6 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                                                   vertical: 16,
                                                 ),
                                           ),
-                                          onChanged: (value) => _calcularIMC(),
                                           validator: (value) {
                                             if (value == null ||
                                                 value.isEmpty) {
@@ -498,9 +489,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                                       ],
                                     ),
                                   ),
-
                                   const SizedBox(width: 16),
-
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment:
@@ -549,7 +538,6 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                                                   vertical: 16,
                                                 ),
                                           ),
-                                          onChanged: (value) => _calcularIMC(),
                                           validator: (value) {
                                             if (value == null ||
                                                 value.isEmpty) {
@@ -566,44 +554,6 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                             ],
                           ),
                         ),
-
-                        // Card IMC
-                        if (_imc != null) ...[
-                          const SizedBox(height: 20),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE0F2F1),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                // ignore: deprecated_member_use
-                                color: const Color(0xFF00897B).withOpacity(0.3),
-                                width: 1,
-                              ),
-                            ),
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Índice de Massa Corporal',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${_imc!.toStringAsFixed(1)} kg/m²',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF00897B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -614,7 +564,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
         ),
       ),
 
-      // Botão fixo no bottom
+      // Botão fixo no bottom com indicador de loading
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -623,7 +573,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
         padding: const EdgeInsets.all(16),
         child: SafeArea(
           child: ElevatedButton(
-            onPressed: _salvarPaciente,
+            onPressed: _estaCarregando ? null : _salvarPaciente,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00897B),
               foregroundColor: Colors.white,
@@ -635,12 +585,24 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.save, size: 20),
-                SizedBox(width: 8),
+              children: [
+                _estaCarregando
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.save, size: 20),
+                const SizedBox(width: 8),
                 Text(
-                  'Salvar Paciente',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  _estaCarregando ? 'Salvando...' : 'Salvar Paciente',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),

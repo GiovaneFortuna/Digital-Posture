@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -91,7 +92,7 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
     }
 
     final patient = patients.firstWhere((p) => p.id == selectedPatientId);
-    final phoneNumber = patient.phone.replaceAll(RegExp(r'\D'), '');
+    final phoneNumber = patient.telefone.replaceAll(RegExp(r'\D'), '');
     final encodedMessage = Uri.encodeComponent(message);
     final whatsappUrl = 'https://wa.me/$phoneNumber?text=$encodedMessage';
 
@@ -263,7 +264,8 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
                                               ? const Color(0xFF00897B)
                                               : Colors.grey[400],
                                           child: Text(
-                                            patient.name[0].toUpperCase(),
+                                            patient.nomeCompleto[0]
+                                                .toUpperCase(),
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 20,
@@ -278,7 +280,7 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                patient.name,
+                                                patient.nomeCompleto,
                                                 style: const TextStyle(
                                                   fontSize: 16,
                                                   fontWeight: FontWeight.w600,
@@ -287,7 +289,7 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                patient.phone,
+                                                patient.telefone,
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   color: Colors.grey[600],

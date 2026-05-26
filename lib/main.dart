@@ -5,26 +5,27 @@ import 'package:digital_posture/screens/whatsapp_screen.dart';
 import 'package:digital_posture/screens/lembretes_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-// Importações do seu projeto
 import 'package:digital_posture/cores/app_colors.dart';
 import 'package:digital_posture/screens/home_screen.dart';
 import 'package:digital_posture/screens/screen_one.dart';
 
-// Variável global para armazenar as câmeras disponíveis
 List<CameraDescription> cameras = [];
 
 Future<void> main() async {
-  // Garante que os plugins inicializem antes do runApp
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    // Carrega as câmeras do dispositivo
-    cameras = await availableCameras();
-  } on CameraException catch (e) {
-    debugPrint('Erro ao inicializar câmeras: ${e.description}');
-  }
+  await dotenv.load(fileName: ".env");
+
+  await Supabase.initialize(
+    url: dotenv.env['supabase_api_url'] ?? '',
+    anonKey: dotenv.env['supabase_api_keys'] ?? '',
+  );
+
+  // <- adicione essa linha
+  cameras = await availableCameras();
 
   runApp(const DigitalPostureApp());
 }
@@ -58,8 +59,6 @@ class DigitalPostureApp extends StatelessWidget {
         '/whatsapp': (context) => const ProtectedRoute(child: WhatsAppScreen()),
         '/lembretes': (context) =>
             const ProtectedRoute(child: LembretesScreen()),
-
-        // Outras rotas em desenvolvimento
         '/analise': (context) => const ProtectedRoute(
           child: PlaceholderScreen(title: 'Análise com IA'),
         ),
@@ -86,12 +85,12 @@ class _InitialRouteHandlerState extends State<InitialRouteHandler> {
 
   Future<void> _checkAuthentication() async {
     await Future.delayed(const Duration(milliseconds: 500));
-    final prefs = await SharedPreferences.getInstance();
-    final userStr = prefs.getString('user');
+
+    final session = Supabase.instance.client.auth.currentSession;
 
     if (!mounted) return;
 
-    if (userStr != null && userStr.contains('{')) {
+    if (session != null) {
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       Navigator.pushReplacementNamed(context, '/auth');
@@ -127,18 +126,15 @@ class _ProtectedRouteState extends State<ProtectedRoute> {
   }
 
   Future<void> _checkStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userStr = prefs.getString('user');
+    final session = Supabase.instance.client.auth.currentSession;
 
     if (mounted) {
       setState(() {
-        _isAuthenticated = userStr != null && userStr.contains('{');
+        _isAuthenticated = session != null;
         _isLoading = false;
       });
 
       if (!_isAuthenticated) {
-        await prefs.remove('user');
-        // ignore: use_build_context_synchronously
         Navigator.pushReplacementNamed(context, '/auth');
       }
     }
@@ -153,7 +149,6 @@ class _ProtectedRouteState extends State<ProtectedRoute> {
   }
 }
 
-// --- TELAS TEMPORÁRIAS ---
 class PlaceholderScreen extends StatelessWidget {
   final String title;
   const PlaceholderScreen({super.key, required this.title});

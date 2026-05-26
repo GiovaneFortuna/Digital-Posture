@@ -1,41 +1,48 @@
 import 'package:flutter/material.dart';
-import '../repository/auth_repository_implement.dart';
-import '../repository/auth_repository.dart';
 import '../models/menu_item_model.dart';
 import '../widgets/menu_card_widget.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
-  // ignore: use_super_parameters
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Instância do repositório seguindo Clean Architecture
-  final IAuthRepository _authRepository = AuthRepositoryImpl();
-
-  Map<String, dynamic>? user;
+  String? _nomeProfissional;
 
   @override
   void initState() {
     super.initState();
-    _loadUser();
+    _loadProfissional();
   }
 
-  // Lógica agora utiliza o repositório, sem conhecer SharedPreferences
-  Future<void> _loadUser() async {
-    final userData = await _authRepository.getLoggedUser();
-    if (userData != null) {
-      setState(() {
-        user = userData;
-      });
+  Future<void> _loadProfissional() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+
+      if (userId == null) return;
+
+      final dados = await Supabase.instance.client
+          .from('profissionais')
+          .select('name')
+          .eq('id', userId)
+          .single();
+
+      if (mounted) {
+        setState(() {
+          _nomeProfissional = dados['name'];
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar profissional: $e');
     }
   }
 
   Future<void> _handleLogout() async {
-    await _authRepository.logout();
+    await Supabase.instance.client.auth.signOut();
     if (mounted) {
       Navigator.pushReplacementNamed(context, '/auth');
     }
@@ -102,8 +109,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- MÉTODOS AUXILIARES DE UI ---
-
   Widget _buildHeader() {
     return Container(
       decoration: BoxDecoration(
@@ -114,7 +119,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            // ignore: deprecated_member_use
             color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 5),
@@ -146,19 +150,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       size: 20,
                     ),
                     style: IconButton.styleFrom(
-                      // ignore: deprecated_member_use
                       backgroundColor: Colors.white.withOpacity(0.2),
                     ),
                   ),
                 ],
               ),
-              if (user != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Olá, ${user!['name'] ?? 'Usuário'}',
-                  style: const TextStyle(color: Colors.white, fontSize: 18),
+              const SizedBox(height: 16),
+              Text(
+                'Olá, ${_nomeProfissional ?? 'Carregando...'}! 👋',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
                 ),
-              ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Bem-vindo ao Digital Posture',
+                style: TextStyle(color: Color(0xFFE0F2F1), fontSize: 13),
+              ),
             ],
           ),
         ),

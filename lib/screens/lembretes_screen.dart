@@ -528,7 +528,7 @@ class _LembretesScreenState extends State<LembretesScreen> {
                                               ? const Color(0xFF00897B)
                                               : Colors.grey[400],
                                           child: Text(
-                                            _getInitial(patient.name),
+                                            _getInitial(patient.nomeCompleto),
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 20,
@@ -539,8 +539,8 @@ class _LembretesScreenState extends State<LembretesScreen> {
                                         const SizedBox(width: 12),
                                         Expanded(
                                           child: Text(
-                                            patient.name.isNotEmpty
-                                                ? patient.name
+                                            patient.nomeCompleto.isNotEmpty
+                                                ? patient.nomeCompleto
                                                 : 'Paciente',
                                             style: const TextStyle(
                                               fontSize: 16,
