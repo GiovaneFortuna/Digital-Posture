@@ -119,6 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 5),
@@ -150,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       size: 20,
                     ),
                     style: IconButton.styleFrom(
+                      // ignore: deprecated_member_use
                       backgroundColor: Colors.white.withOpacity(0.2),
                     ),
                   ),
