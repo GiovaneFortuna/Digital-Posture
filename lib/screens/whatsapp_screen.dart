@@ -330,6 +330,7 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
                         decoration: InputDecoration(
                           hintText: 'Buscar paciente...',
                           hintStyle: TextStyle(
+                            // ignore: deprecated_member_use
                             color: Colors.white.withOpacity(0.7),
                           ),
                           prefixIcon: const Icon(
@@ -337,6 +338,7 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
                             color: Colors.white70,
                           ),
                           filled: true,
+                          // ignore: deprecated_member_use
                           fillColor: Colors.white.withOpacity(0.2),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),

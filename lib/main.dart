@@ -57,8 +57,7 @@ class DigitalPostureApp extends StatelessWidget {
         '/checklist': (context) =>
             const ProtectedRoute(child: ChecklistScreen()),
         '/whatsapp': (context) => const ProtectedRoute(child: WhatsAppScreen()),
-        '/lembretes': (context) =>
-            const ProtectedRoute(child: LembretesScreen()),
+        '/lembretes': (context) => ProtectedRoute(child: LembretesScreen()),
         '/analise': (context) => const ProtectedRoute(
           child: PlaceholderScreen(title: 'Análise com IA'),
         ),

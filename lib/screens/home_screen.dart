@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/menu_item_model.dart';
 import '../widgets/menu_card_widget.dart';
@@ -37,7 +38,9 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (e) {
-      print('Erro ao carregar profissional: $e');
+      if (kDebugMode) {
+        print('Erro ao carregar profissional: $e');
+      }
     }
   }
 
