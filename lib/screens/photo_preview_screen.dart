@@ -17,10 +17,10 @@ class PhotoPreviewScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // Foto ocupando a maior parte da tela
+          // ✅ Foto ocupando menos espaço para os botões ficarem mais acima
           Expanded(
+            flex: 8, // ✅ 80% da tela para a foto
             child: InteractiveViewer(
-              // Permite zoom na imagem com pinch
               minScale: 1.0,
               maxScale: 4.0,
               child: Center(
@@ -40,55 +40,54 @@ class PhotoPreviewScreen extends StatelessWidget {
             ),
           ),
 
-          // Botões de ação
-          Container(
-            color: Colors.black87,
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // Botão: Tirar outra foto
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.refresh, color: Colors.white),
-                  label: const Text(
-                    'Refazer',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.white54),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                  ),
-                ),
-
-                // Botão: Usar foto / Enviar para análise
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Exemplo: Navigator.pushNamed(context, '/analise', arguments: imagePath);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Foto enviada para análise!'),
-                        backgroundColor: Color(0xFF00897B),
+          // ✅ Botões com flex menor para subir na tela
+          Expanded(
+            flex: 2, // ✅ 20% da tela para os botões
+            child: Container(
+              color: Colors.black87,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Botão Refazer
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.refresh, color: Colors.white),
+                      label: const Text(
+                        'Refazer',
+                        style: TextStyle(color: Colors.white),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.check, color: Colors.white),
-                  label: const Text(
-                    'Usar foto',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00897B),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 12,
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.white54),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 16),
+                  // Botão Usar foto
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/analise',
+                          arguments: imagePath, // ✅ Passa o caminho da foto
+                        );
+                      },
+                      icon: const Icon(Icons.check, color: Colors.white),
+                      label: const Text(
+                        'Usar foto',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00897B),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

@@ -4,7 +4,8 @@ class Lembrete {
   final String profissionalId;
   final String titulo;
   final String descricao;
-  final String horario;
+  final DateTime dataLembrete; // ✅ Atualizado
+  final bool concluido; // ✅ Novo campo
   final DateTime? createdAt;
 
   Lembrete({
@@ -13,7 +14,8 @@ class Lembrete {
     required this.profissionalId,
     required this.titulo,
     required this.descricao,
-    required this.horario,
+    required this.dataLembrete,
+    this.concluido = false,
     this.createdAt,
   });
 
@@ -22,7 +24,8 @@ class Lembrete {
     'profissional_id': profissionalId,
     'titulo': titulo,
     'descricao': descricao,
-    'horario': horario,
+    'data_lembrete': dataLembrete.toIso8601String(), // ✅ Atualizado
+    'concluido': concluido,
   };
 
   factory Lembrete.fromJson(Map<String, dynamic> json) => Lembrete(
@@ -31,7 +34,12 @@ class Lembrete {
     profissionalId: json['profissional_id']?.toString() ?? '',
     titulo: json['titulo']?.toString() ?? '',
     descricao: json['descricao']?.toString() ?? '',
-    horario: json['horario']?.toString() ?? '',
+    dataLembrete:
+        json['data_lembrete'] !=
+            null // ✅ Atualizado
+        ? DateTime.parse(json['data_lembrete'].toString())
+        : DateTime.now(),
+    concluido: json['concluido'] ?? false,
     createdAt: json['created_at'] != null
         ? DateTime.parse(json['created_at'].toString())
         : null,

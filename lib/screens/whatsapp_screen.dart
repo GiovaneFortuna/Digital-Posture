@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart'; // ✅ Modificado: Usando o pacote oficial estável
+import 'package:url_launcher/url_launcher.dart';
 import '../models/paciente_model.dart';
 import '../models/mensagem_rapida.dart';
 import '../constants/mensagens_whatsapp.dart';
@@ -63,12 +63,23 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
     super.dispose();
   }
 
+  // ✅ Filtra por profissional_id e ativo = true
   Future<void> _loadPatients() async {
     setState(() => _isLoading = true);
     try {
+      final userId = _supabase.auth.currentUser?.id;
+
+      if (userId == null) {
+        _showSnackBar('Usuário não autenticado!', Colors.red);
+        setState(() => _isLoading = false);
+        return;
+      }
+
       final response = await _supabase
           .from('pacientes')
           .select()
+          .eq('profissional_id', userId)
+          .eq('ativo', true)
           .order('name', ascending: true);
 
       if (mounted) {
@@ -153,6 +164,10 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF00897B)),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -163,6 +178,10 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
                 labelText: 'Telefone',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF00897B)),
                 ),
               ),
             ),
@@ -185,7 +204,7 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
                     .eq('id', paciente.id!);
 
                 if (context.mounted) Navigator.pop(context);
-                _showSnackBar('Paciente updated!', const Color(0xFF00897B));
+                _showSnackBar('Paciente atualizado!', const Color(0xFF00897B));
                 _loadPatients();
               } catch (e) {
                 _showSnackBar('Erro ao editar: $e', Colors.red);
@@ -201,7 +220,6 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
     );
   }
 
-  // ✅ Método de envio totalmente reformulado usando url_launcher universal
   Future<void> _sendMessage(String message) async {
     if (selectedPatientId == null) {
       _showSnackBar('Selecione um paciente primeiro!', Colors.red);
@@ -219,28 +237,19 @@ class _WhatsAppScreenState extends State<WhatsAppScreen> {
 
     final mensagemFinal = message.replaceAll('{nome}', nome);
 
-    // Trata o número limpando caracteres e inserindo o DDI do Brasil (55)
     String phoneNumber = telefone.replaceAll(RegExp(r'\D'), '');
     if (!phoneNumber.startsWith('55')) {
       phoneNumber = '55$phoneNumber';
     }
 
-    // Codifica a mensagem para o formato seguro de URL (converte espaços e acentos)
     final urlEncodedMessage = Uri.encodeComponent(mensagemFinal);
-
-    // Constrói a URI universal do WhatsApp (funciona em Android, iOS e Web)
     final whatsappUri = Uri.parse(
       'https://wa.me/$phoneNumber?text=$urlEncodedMessage',
     );
 
     try {
-      // Tenta abrir o aplicativo nativo ou o navegador
       if (await canLaunchUrl(whatsappUri)) {
-        await launchUrl(
-          whatsappUri,
-          mode: LaunchMode
-              .externalApplication, // ✅ Força abrir fora do app (direto no WhatsApp)
-        );
+        await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
       } else {
         _showSnackBar('Não foi possível abrir o WhatsApp.', Colors.red);
       }

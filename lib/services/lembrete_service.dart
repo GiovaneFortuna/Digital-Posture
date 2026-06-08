@@ -9,12 +9,13 @@ class LembreteService {
 
   // Busca pacientes do profissional logado
   Future<List<Paciente>> carregarPacientes() async {
-    if (_userId == null) return [];
+    final userId = _userId;
+    if (userId == null) return [];
 
     final response = await _supabase
         .from('pacientes')
         .select()
-        .eq('profissional_id', _userId!)
+        .eq('profissional_id', userId)
         .eq('ativo', true)
         .order('name', ascending: true);
 
@@ -23,12 +24,13 @@ class LembreteService {
 
   // Busca lembretes do profissional logado no Supabase
   Future<List<Lembrete>> carregarLembretes() async {
-    if (_userId == null) return [];
+    final userId = _userId;
+    if (userId == null) return [];
 
     final response = await _supabase
         .from('lembretes')
         .select()
-        .eq('profissional_id', _userId!)
+        .eq('profissional_id', userId)
         .order('created_at', ascending: false);
 
     return (response as List).map((item) => Lembrete.fromJson(item)).toList();
@@ -40,16 +42,17 @@ class LembreteService {
     required String pacienteId,
     required String titulo,
     required String descricao,
-    required String horario,
+    required DateTime dataLembrete, // ✅ Atualizado para o novo schema
   }) async {
-    if (_userId == null) return lembretesAtuais;
+    final userId = _userId;
+    if (userId == null) return lembretesAtuais;
 
     final lembrete = Lembrete(
       pacienteId: pacienteId,
-      profissionalId: _userId!,
+      profissionalId: userId,
       titulo: titulo,
       descricao: descricao,
-      horario: horario,
+      dataLembrete: dataLembrete, // ✅ Atualizado para o novo schema
     );
 
     final response = await _supabase
@@ -60,6 +63,30 @@ class LembreteService {
 
     final novoLembrete = Lembrete.fromJson(response);
     return [novoLembrete, ...lembretesAtuais];
+  }
+
+  // Marca lembrete como concluído
+  Future<List<Lembrete>> concluirLembrete({
+    required List<Lembrete> lembretesAtuais,
+    required String id,
+  }) async {
+    await _supabase.from('lembretes').update({'concluido': true}).eq('id', id);
+
+    return lembretesAtuais.map((l) {
+      if (l.id == id) {
+        return Lembrete(
+          id: l.id,
+          pacienteId: l.pacienteId,
+          profissionalId: l.profissionalId,
+          titulo: l.titulo,
+          descricao: l.descricao,
+          dataLembrete: l.dataLembrete,
+          concluido: true, // ✅ Atualiza localmente
+          createdAt: l.createdAt,
+        );
+      }
+      return l;
+    }).toList();
   }
 
   // Deleta lembrete no Supabase

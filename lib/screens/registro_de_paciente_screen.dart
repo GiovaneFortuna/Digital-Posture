@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Import do Supabase
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegistroDePacienteScreen extends StatefulWidget {
   const RegistroDePacienteScreen({super.key});
@@ -18,7 +18,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
   final TextEditingController _alturaController = TextEditingController();
 
   String? _sexoSelecionado;
-  bool _estaCarregando = false; // Para mostrar um indicador de progresso
+  bool _estaCarregando = false;
 
   @override
   void dispose() {
@@ -43,27 +43,37 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
       return;
     }
 
-    setState(() {
-      _estaCarregando = true;
-    });
+    setState(() => _estaCarregando = true);
 
     try {
-      // Envia os dados diretamente para a tabela 'pacientes' no Supabase
+      // ✅ Pega o ID do profissional logado
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+
+      if (userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Usuário não autenticado!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       await Supabase.instance.client.from('pacientes').insert({
-        'name': _nomeController.text,
-        'telefone': _telefoneController.text,
-        'idade':
-            int.tryParse(_idadeController.text) ??
-            0, // Garante que envia como número se o banco exigir
+        'name': _nomeController.text.trim(),
+        'telefone': _telefoneController.text.trim(),
+        'idade': int.tryParse(_idadeController.text) ?? 0,
         'sexo': _sexoSelecionado,
         'peso': double.tryParse(_pesoController.text) ?? 0.0,
         'altura': int.tryParse(_alturaController.text) ?? 0,
+        'profissional_id': userId, // ✅ Vincula ao profissional logado
+        'ativo': true, // ✅ Garante que ativo = true
       });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Paciente cadastrado com sucesso no Supabase!'),
+            content: Text('Paciente cadastrado com sucesso!'),
             backgroundColor: Color(0xFF00897B),
           ),
         );
@@ -80,9 +90,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _estaCarregando = false;
-        });
+        setState(() => _estaCarregando = false);
       }
     }
   }
@@ -101,7 +109,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
         child: SafeArea(
           child: Column(
             children: [
-              // Header
+              // ── Header ──────────────────────────────────────────
               Container(
                 decoration: BoxDecoration(
                   color: const Color(0xFF00897B),
@@ -161,7 +169,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                 ),
               ),
 
-              // Form
+              // ── Form ────────────────────────────────────────────
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
@@ -250,7 +258,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                                 controller: _telefoneController,
                                 keyboardType: TextInputType.phone,
                                 decoration: InputDecoration(
-                                  hintText: 'Ex: +5511999887766',
+                                  hintText: 'Ex: 51999887766',
                                   prefixIcon: const Icon(
                                     Icons.phone_outlined,
                                     color: Colors.grey,
@@ -411,9 +419,9 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
                                             ),
                                           ],
                                           onChanged: (value) {
-                                            setState(() {
-                                              _sexoSelecionado = value;
-                                            });
+                                            setState(
+                                              () => _sexoSelecionado = value,
+                                            );
                                           },
                                         ),
                                       ],
@@ -564,7 +572,7 @@ class _RegistroDePacienteScreenState extends State<RegistroDePacienteScreen> {
         ),
       ),
 
-      // Botão fixo no bottom com indicador de loading
+      // ── Botão fixo no bottom ─────────────────────────────────
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,

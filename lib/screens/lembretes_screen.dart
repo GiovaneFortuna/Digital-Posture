@@ -20,7 +20,7 @@ class _LembretesScreenState extends State<LembretesScreen> {
 
   final _tituloController = TextEditingController();
   final _descricaoController = TextEditingController();
-  TimeOfDay? _horarioSelecionado;
+  DateTime? _dataLembreteSelecionada;
 
   @override
   void initState() {
@@ -73,14 +73,10 @@ class _LembretesScreenState extends State<LembretesScreen> {
       _showSnackBar('Por favor, insira um título para o lembrete.', Colors.red);
       return;
     }
-    if (_horarioSelecionado == null) {
-      _showSnackBar('Por favor, selecione um horário.', Colors.red);
+    if (_dataLembreteSelecionada == null) {
+      _showSnackBar('Por favor, selecione a data e horário.', Colors.red);
       return;
     }
-
-    final horario =
-        '${_horarioSelecionado!.hour.toString().padLeft(2, '0')}:'
-        '${_horarioSelecionado!.minute.toString().padLeft(2, '0')}';
 
     try {
       final updatedLembretes = await _service.salvarLembrete(
@@ -88,7 +84,7 @@ class _LembretesScreenState extends State<LembretesScreen> {
         pacienteId: selectedPatientId!,
         titulo: _tituloController.text.trim(),
         descricao: _descricaoController.text.trim(),
-        horario: horario,
+        dataLembrete: _dataLembreteSelecionada!,
       );
 
       if (mounted) {
@@ -96,7 +92,7 @@ class _LembretesScreenState extends State<LembretesScreen> {
           lembretes = updatedLembretes;
           _tituloController.clear();
           _descricaoController.clear();
-          _horarioSelecionado = null;
+          _dataLembreteSelecionada = null;
         });
         _showSnackBar('Lembrete salvo com sucesso!', const Color(0xFF00897B));
         Navigator.pop(context);
@@ -118,11 +114,73 @@ class _LembretesScreenState extends State<LembretesScreen> {
     }
   }
 
+  Future<void> _concluirLembrete(String id) async {
+    try {
+      final updatedLembretes = await _service.concluirLembrete(
+        lembretesAtuais: lembretes,
+        id: id,
+      );
+      setState(() => lembretes = updatedLembretes);
+    } catch (e) {
+      _showSnackBar('Erro ao concluir lembrete: $e', Colors.red);
+    }
+  }
+
   void _showSnackBar(String text, Color background) {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(text), backgroundColor: background));
+  }
+
+  // ✅ Seleciona data e hora juntos
+  Future<void> _selecionarDataHora(StateSetter setModalState) async {
+    final data = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: Color(0xFF00897B)),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (data == null || !mounted) return;
+
+    final hora = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(primary: Color(0xFF00897B)),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (hora == null) return;
+
+    final dataHora = DateTime(
+      data.year,
+      data.month,
+      data.day,
+      hora.hour,
+      hora.minute,
+    );
+
+    setModalState(() => _dataLembreteSelecionada = dataHora);
+    setState(() => _dataLembreteSelecionada = dataHora);
+  }
+
+  String _formatarDataHora(DateTime data) {
+    return '${data.day.toString().padLeft(2, '0')}/'
+        '${data.month.toString().padLeft(2, '0')}/'
+        '${data.year} às '
+        '${data.hour.toString().padLeft(2, '0')}:'
+        '${data.minute.toString().padLeft(2, '0')}';
   }
 
   void _abrirFormulario() {
@@ -228,29 +286,12 @@ class _LembretesScreenState extends State<LembretesScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Horário',
+                'Data e Horário',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 8),
               InkWell(
-                onTap: () async {
-                  final picked = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.now(),
-                    builder: (context, child) => Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: const ColorScheme.light(
-                          primary: Color(0xFF00897B),
-                        ),
-                      ),
-                      child: child!,
-                    ),
-                  );
-                  if (picked != null) {
-                    setModalState(() => _horarioSelecionado = picked);
-                    setState(() => _horarioSelecionado = picked);
-                  }
-                },
+                onTap: () => _selecionarDataHora(setModalState),
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -261,22 +302,22 @@ class _LembretesScreenState extends State<LembretesScreen> {
                     color: Colors.grey[50],
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: _horarioSelecionado != null
+                      color: _dataLembreteSelecionada != null
                           ? const Color(0xFF00897B)
                           : Colors.grey[200]!,
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.access_time, color: Colors.grey),
+                      const Icon(Icons.calendar_today, color: Colors.grey),
                       const SizedBox(width: 12),
                       Text(
-                        _horarioSelecionado != null
-                            ? '${_horarioSelecionado!.hour.toString().padLeft(2, '0')}:${_horarioSelecionado!.minute.toString().padLeft(2, '0')}'
-                            : 'Selecionar horário',
+                        _dataLembreteSelecionada != null
+                            ? _formatarDataHora(_dataLembreteSelecionada!)
+                            : 'Selecionar data e horário',
                         style: TextStyle(
                           fontSize: 14,
-                          color: _horarioSelecionado != null
+                          color: _dataLembreteSelecionada != null
                               ? Colors.black87
                               : Colors.grey,
                         ),
@@ -562,7 +603,9 @@ class _LembretesScreenState extends State<LembretesScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.all(16),
                                       decoration: BoxDecoration(
-                                        color: Colors.white,
+                                        color: lembrete.concluido
+                                            ? Colors.grey[50]
+                                            : Colors.white,
                                         borderRadius: BorderRadius.circular(16),
                                         boxShadow: [
                                           BoxShadow(
@@ -583,13 +626,20 @@ class _LembretesScreenState extends State<LembretesScreen> {
                                             width: 48,
                                             height: 48,
                                             decoration: BoxDecoration(
-                                              color: const Color(0xFFE0F2F1),
+                                              color: lembrete.concluido
+                                                  ? Colors.grey[200]
+                                                  : const Color(0xFFE0F2F1),
                                               borderRadius:
                                                   BorderRadius.circular(12),
                                             ),
-                                            child: const Icon(
-                                              Icons.notifications_outlined,
-                                              color: Color(0xFF00897B),
+                                            child: Icon(
+                                              lembrete.concluido
+                                                  ? Icons.check_circle
+                                                  : Icons
+                                                        .notifications_outlined,
+                                              color: lembrete.concluido
+                                                  ? Colors.grey
+                                                  : const Color(0xFF00897B),
                                               size: 24,
                                             ),
                                           ),
@@ -601,10 +651,17 @@ class _LembretesScreenState extends State<LembretesScreen> {
                                               children: [
                                                 Text(
                                                   lembrete.titulo,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 15,
                                                     fontWeight: FontWeight.w600,
-                                                    color: Colors.black87,
+                                                    color: lembrete.concluido
+                                                        ? Colors.grey
+                                                        : Colors.black87,
+                                                    decoration:
+                                                        lembrete.concluido
+                                                        ? TextDecoration
+                                                              .lineThrough
+                                                        : null,
                                                   ),
                                                 ),
                                                 if (lembrete
@@ -623,13 +680,15 @@ class _LembretesScreenState extends State<LembretesScreen> {
                                                 Row(
                                                   children: [
                                                     const Icon(
-                                                      Icons.access_time,
+                                                      Icons.calendar_today,
                                                       size: 14,
                                                       color: Color(0xFF00897B),
                                                     ),
                                                     const SizedBox(width: 4),
                                                     Text(
-                                                      lembrete.horario,
+                                                      _formatarDataHora(
+                                                        lembrete.dataLembrete,
+                                                      ),
                                                       style: const TextStyle(
                                                         fontSize: 13,
                                                         color: Color(
@@ -644,13 +703,30 @@ class _LembretesScreenState extends State<LembretesScreen> {
                                               ],
                                             ),
                                           ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.delete_outline,
-                                              color: Colors.red,
-                                            ),
-                                            onPressed: () =>
-                                                _deletarLembrete(lembrete.id!),
+                                          Column(
+                                            children: [
+                                              if (!lembrete.concluido)
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.check_circle_outline,
+                                                    color: Color(0xFF00897B),
+                                                  ),
+                                                  onPressed: () =>
+                                                      _concluirLembrete(
+                                                        lembrete.id!,
+                                                      ),
+                                                ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  color: Colors.red,
+                                                ),
+                                                onPressed: () =>
+                                                    _deletarLembrete(
+                                                      lembrete.id!,
+                                                    ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),
