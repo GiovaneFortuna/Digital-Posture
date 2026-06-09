@@ -1,3 +1,4 @@
+import 'package:digital_posture/screens/analise_screen.dart';
 import 'package:digital_posture/screens/camera_screen.dart';
 import 'package:digital_posture/screens/registro_de_paciente_screen.dart';
 import 'package:digital_posture/screens/checklist_screen.dart';
@@ -58,9 +59,13 @@ class DigitalPostureApp extends StatelessWidget {
             const ProtectedRoute(child: ChecklistScreen()),
         '/whatsapp': (context) => const ProtectedRoute(child: WhatsAppScreen()),
         '/lembretes': (context) => ProtectedRoute(child: LembretesScreen()),
-        '/analise': (context) => const ProtectedRoute(
-          child: PlaceholderScreen(title: 'Análise com IA'),
-        ),
+        '/analise': (context) {
+          final imagePath =
+              ModalRoute.of(context)!.settings.arguments as String?;
+          return ProtectedRoute(
+            child: AnaliseScreen(imagePath: imagePath ?? ''),
+          );
+        },
       },
     );
   }
