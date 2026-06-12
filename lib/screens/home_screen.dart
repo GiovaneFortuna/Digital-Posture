@@ -23,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadProfissional() async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
-
       if (userId == null) return;
 
       final dados = await Supabase.instance.client
@@ -33,22 +32,16 @@ class _HomeScreenState extends State<HomeScreen> {
           .single();
 
       if (mounted) {
-        setState(() {
-          _nomeProfissional = dados['name'];
-        });
+        setState(() => _nomeProfissional = dados['name']);
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao carregar profissional: $e');
-      }
+      if (kDebugMode) print('Erro ao carregar profissional: $e');
     }
   }
 
   Future<void> _handleLogout() async {
     await Supabase.instance.client.auth.signOut();
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/auth');
-    }
+    if (mounted) Navigator.pushReplacementNamed(context, '/auth');
   }
 
   @override
@@ -61,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
         route: '/cadastro',
         color: const Color(0xFF00897B),
       ),
+
       MenuItemModel(
         title: 'Checklist Digital',
         description: 'Avaliação postural',
@@ -83,18 +77,25 @@ class _HomeScreenState extends State<HomeScreen> {
         color: const Color(0xFF00796B),
       ),
       MenuItemModel(
+        title: 'Histórico',
+        description: 'Avaliações anteriores',
+        icon: Icons.history_outlined,
+        route: '/historico',
+        color: const Color(0xFF00897B),
+      ),
+      MenuItemModel(
         title: 'Lembretes',
         description: 'Notificações educativas',
         icon: Icons.notifications_outlined,
         route: '/lembretes',
-        color: const Color(0xFF00897B),
+        color: const Color(0xFF00796B),
       ),
       MenuItemModel(
         title: 'WhatsApp',
         description: 'Atalhos rápidos',
         icon: Icons.chat_bubble_outline,
         route: '/whatsapp',
-        color: const Color(0xFF00796B),
+        color: const Color(0xFF00897B),
       ),
     ];
 
@@ -113,6 +114,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader() {
+    final inicial = _nomeProfissional != null && _nomeProfissional!.isNotEmpty
+        ? _nomeProfissional![0].toUpperCase()
+        : 'P';
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF00897B),
@@ -146,6 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  // ✅ Só o botão de logout no topo
                   IconButton(
                     onPressed: _handleLogout,
                     icon: const Icon(
@@ -161,18 +167,70 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text(
-                'Olá, ${_nomeProfissional ?? 'Carregando...'}! 👋',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
+              // ✅ Avatar clicável que navega para o perfil
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/perfil'),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        // ignore: deprecated_member_use
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          // ignore: deprecated_member_use
+                          color: Colors.white.withOpacity(0.5),
+                          width: 2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          inicial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Olá, ${_nomeProfissional ?? 'Carregando...'}! 👋',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Text(
+                              'Ver perfil',
+                              style: TextStyle(
+                                color: Color(0xFFE0F2F1),
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              // ignore: deprecated_member_use
+                              color: Colors.white.withOpacity(0.7),
+                              size: 10,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Bem-vindo ao Digital Posture',
-                style: TextStyle(color: Color(0xFFE0F2F1), fontSize: 13),
               ),
             ],
           ),

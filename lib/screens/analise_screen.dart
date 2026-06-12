@@ -8,6 +8,7 @@ import '../models/paciente_model.dart';
 class AnaliseScreen extends StatefulWidget {
   final String imagePath;
   const AnaliseScreen({super.key, required this.imagePath});
+
   @override
   State<AnaliseScreen> createState() => _AnaliseScreenState();
 }
@@ -19,6 +20,8 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
   bool _isSaving = false;
   String? _laudo;
   Map<String, double>? _angulos;
+  Map<String, dynamic>? _coordenadas; // ✅ Guarda coordenadas para resultados_ia
+  int _tempoProcessamentoMs = 0; // ✅ Guarda tempo de processamento
 
   List<Paciente> _pacientes = [];
   Paciente? _pacienteSelecionado;
@@ -53,7 +56,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     }
   }
 
-  // ── Calcula ângulo entre 3 pontos ─────────────────────────────────────────
   double _calcularAngulo(PoseLandmark a, PoseLandmark b, PoseLandmark c) {
     final radians = atan2(c.y - b.y, c.x - b.x) - atan2(a.y - b.y, a.x - b.x);
     double angulo = radians * 180 / pi;
@@ -62,12 +64,10 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     return angulo;
   }
 
-  // ── Diferença de altura entre dois pontos ─────────────────────────────────
   double _diferencaAltura(PoseLandmark a, PoseLandmark b) {
     return (a.y - b.y).abs();
   }
 
-  // ── Analisa a foto com ML Kit ─────────────────────────────────────────────
   Future<void> _analisar() async {
     if (_pacienteSelecionado == null) {
       _showSnackBar('Selecione um paciente primeiro!', Colors.red);
@@ -78,9 +78,13 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
       _isAnalisando = true;
       _laudo = null;
       _angulos = null;
+      _coordenadas = null;
     });
 
     try {
+      // ✅ Mede o tempo de processamento
+      final stopwatch = Stopwatch()..start();
+
       final inputImage = InputImage.fromFilePath(widget.imagePath);
       final poseDetector = PoseDetector(
         options: PoseDetectorOptions(mode: PoseDetectionMode.single),
@@ -88,6 +92,9 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
 
       final poses = await poseDetector.processImage(inputImage);
       await poseDetector.close();
+
+      stopwatch.stop();
+      _tempoProcessamentoMs = stopwatch.elapsedMilliseconds;
 
       if (poses.isEmpty) {
         setState(() {
@@ -105,7 +112,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
       final pose = poses.first;
       final landmarks = pose.landmarks;
 
-      // ── Pontos do corpo ──────────────────────────────────────────
       final ombroEsq = landmarks[PoseLandmarkType.leftShoulder];
       final ombroDireito = landmarks[PoseLandmarkType.rightShoulder];
       final quadrilEsq = landmarks[PoseLandmarkType.leftHip];
@@ -134,7 +140,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
         return;
       }
 
-      // ── Cálculo dos ângulos ──────────────────────────────────────
       final anguloJoelhoEsq = _calcularAngulo(quadrilEsq, joelhoEsq, tornEsq);
       final anguloJoelhoDir = _calcularAngulo(quadrilDir, joelhoDir, tornDir);
       final anguloQuadrilEsq = _calcularAngulo(ombroEsq, quadrilEsq, joelhoEsq);
@@ -143,10 +148,30 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
         quadrilDir,
         joelhoDir,
       );
-
-      // ── Desníveis ────────────────────────────────────────────────
       final desnivelOmbros = _diferencaAltura(ombroEsq, ombroDireito);
       final desnivelQuadril = _diferencaAltura(quadrilEsq, quadrilDir);
+
+      // ✅ Salva todas as coordenadas dos 33 pontos para resultados_ia
+      final coordenadas = <String, dynamic>{};
+      for (final entry in landmarks.entries) {
+        final lm = entry.value;
+        coordenadas[entry.key.name] = {
+          'x': lm.x,
+          'y': lm.y,
+          'z': lm.z,
+          'likelihood': lm.likelihood,
+        };
+      }
+
+      // ✅ Adiciona os ângulos calculados nas coordenadas
+      coordenadas['angulos_calculados'] = {
+        'joelho_esquerdo': anguloJoelhoEsq,
+        'joelho_direito': anguloJoelhoDir,
+        'quadril_esquerdo': anguloQuadrilEsq,
+        'quadril_direito': anguloQuadrilDir,
+        'desnivel_ombros_px': desnivelOmbros,
+        'desnivel_quadril_px': desnivelQuadril,
+      };
 
       final angulos = {
         'Joelho Esquerdo': anguloJoelhoEsq,
@@ -157,7 +182,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
         'Desnível Quadril (px)': desnivelQuadril,
       };
 
-      // ── Gera o laudo textual ─────────────────────────────────────
       final laudo = _gerarLaudo(
         anguloJoelhoEsq: anguloJoelhoEsq,
         anguloJoelhoDir: anguloJoelhoDir,
@@ -174,6 +198,7 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
 
       setState(() {
         _angulos = angulos;
+        _coordenadas = coordenadas; // ✅ Guarda para usar no _salvar()
         _laudo = laudo;
         _isAnalisando = false;
       });
@@ -185,7 +210,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     }
   }
 
-  // ── Gera laudo em português ───────────────────────────────────────────────
   String _gerarLaudo({
     required double anguloJoelhoEsq,
     required double anguloJoelhoDir,
@@ -208,7 +232,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     buffer.writeln('─' * 35);
     buffer.writeln();
 
-    // ── Cabeça e cervical ────────────────────────────────────────
     buffer.writeln('CABEÇA E CERVICAL');
     if (temOrelha && orelhaEsq != null && orelhaDir != null) {
       final desnivelOrelhas = _diferencaAltura(orelhaEsq, orelhaDir);
@@ -218,7 +241,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
       } else {
         buffer.writeln('• Alinhamento da cabeça dentro do esperado');
       }
-      // Anteriorização da cabeça
       final medOmbroX = (ombroEsq.x + ombroDireito.x) / 2;
       final medOrelhaX = (orelhaEsq.x + orelhaDir.x) / 2;
       if ((medOrelhaX - medOmbroX).abs() > 30) {
@@ -230,7 +252,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     }
     buffer.writeln();
 
-    // ── Ombros ───────────────────────────────────────────────────
     buffer.writeln('OMBROS');
     if (desnivelOmbros > 20) {
       final ladoElevado = ombroEsq.y < ombroDireito.y ? 'esquerdo' : 'direito';
@@ -241,7 +262,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     }
     buffer.writeln();
 
-    // ── Quadril ──────────────────────────────────────────────────
     buffer.writeln('QUADRIL');
     if (desnivelQuadril > 20) {
       buffer.writeln('• Desnível pélvico detectado');
@@ -251,7 +271,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     }
     buffer.writeln();
 
-    // ── Joelhos ──────────────────────────────────────────────────
     buffer.writeln('JOELHOS');
     final diffJoelhos = (anguloJoelhoEsq - anguloJoelhoDir).abs();
     if (anguloJoelhoEsq < 160) {
@@ -277,7 +296,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     }
     buffer.writeln();
 
-    // ── Conclusão ────────────────────────────────────────────────
     buffer.writeln('─' * 35);
     buffer.writeln('CONCLUSÃO');
     if (achados.isEmpty) {
@@ -306,7 +324,7 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
         '${data.year}';
   }
 
-  // ── Salva no Supabase ─────────────────────────────────────────────────────
+  // ✅ Salva em avaliacoes + capturas_imagem + resultados_ia
   Future<void> _salvar() async {
     if (_pacienteSelecionado == null || _laudo == null) return;
 
@@ -316,16 +334,50 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      await _supabase.from('avaliacoes').insert({
-        'paciente_id': _pacienteSelecionado!.id,
-        'profissional_id': userId,
-        'data_avaliacao': DateTime.now().toIso8601String(),
-        'status': 'concluida',
-        'observacoes': _laudo,
-        'conclusao_geral': _laudo!.contains('dentro dos padrões')
-            ? 'Sem alterações significativas'
-            : 'Alterações posturais identificadas',
-      });
+      final conclusao = _laudo!.contains('dentro dos padrões')
+          ? 'Sem alterações significativas'
+          : 'Alterações posturais identificadas';
+
+      // ── 1. Salva em avaliacoes ───────────────────────────────
+      final avaliacaoResponse = await _supabase
+          .from('avaliacoes')
+          .insert({
+            'paciente_id': _pacienteSelecionado!.id,
+            'profissional_id': userId,
+            'data_avaliacao': DateTime.now().toIso8601String(),
+            'status': 'concluida',
+            'observacoes': _laudo,
+            'conclusao_geral': conclusao,
+            'foto_url': widget.imagePath,
+          })
+          .select()
+          .single();
+
+      final avaliacaoId = avaliacaoResponse['id'];
+
+      // ── 2. Salva em capturas_imagem ──────────────────────────
+      final capturaResponse = await _supabase
+          .from('capturas_imagem')
+          .insert({
+            'avaliacao_id': avaliacaoId,
+            'url_original': widget.imagePath,
+            'plano_anatomico': 'frontal',
+            'lado_corpo': 'anterior',
+          })
+          .select()
+          .single();
+
+      final capturaId = capturaResponse['id'];
+
+      // ── 3. Salva em resultados_ia ────────────────────────────
+      if (_coordenadas != null) {
+        await _supabase.from('resultados_ia').insert({
+          'captura_id': capturaId,
+          'coordenadas_pontos': _coordenadas,
+          'versao_modelo': 'google_mlkit_pose_detection_v0.14.1',
+          'tempo_processamento_ms': _tempoProcessamentoMs,
+        });
+      }
 
       if (mounted) {
         _showSnackBar('Avaliação salva com sucesso!', const Color(0xFF00897B));
@@ -640,26 +692,5 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
         ],
       ),
     );
-  }
-}
-
-// Helper para navegação
-class NamedRoute extends Route {
-  final String name;
-  NamedRoute(this.name);
-
-  @override
-  bool get isCurrent => false;
-
-  @override
-  bool get isFirst => false;
-
-  @override
-  bool get hasActiveRouteBelow => false;
-
-  @override
-  bool didPop(result) {
-    super.didPop(result);
-    return false;
   }
 }
