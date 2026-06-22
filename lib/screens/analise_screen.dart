@@ -20,8 +20,8 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
   bool _isSaving = false;
   String? _laudo;
   Map<String, double>? _angulos;
-  Map<String, dynamic>? _coordenadas; // ✅ Guarda coordenadas para resultados_ia
-  int _tempoProcessamentoMs = 0; // ✅ Guarda tempo de processamento
+  Map<String, dynamic>? _coordenadas;
+  int _tempoProcessamentoMs = 0;
 
   List<Paciente> _pacientes = [];
   Paciente? _pacienteSelecionado;
@@ -82,7 +82,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
     });
 
     try {
-      // ✅ Mede o tempo de processamento
       final stopwatch = Stopwatch()..start();
 
       final inputImage = InputImage.fromFilePath(widget.imagePath);
@@ -151,7 +150,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
       final desnivelOmbros = _diferencaAltura(ombroEsq, ombroDireito);
       final desnivelQuadril = _diferencaAltura(quadrilEsq, quadrilDir);
 
-      // ✅ Salva todas as coordenadas dos 33 pontos para resultados_ia
       final coordenadas = <String, dynamic>{};
       for (final entry in landmarks.entries) {
         final lm = entry.value;
@@ -163,7 +161,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
         };
       }
 
-      // ✅ Adiciona os ângulos calculados nas coordenadas
       coordenadas['angulos_calculados'] = {
         'joelho_esquerdo': anguloJoelhoEsq,
         'joelho_direito': anguloJoelhoDir,
@@ -198,7 +195,7 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
 
       setState(() {
         _angulos = angulos;
-        _coordenadas = coordenadas; // ✅ Guarda para usar no _salvar()
+        _coordenadas = coordenadas;
         _laudo = laudo;
         _isAnalisando = false;
       });
@@ -324,7 +321,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
         '${data.year}';
   }
 
-  // ✅ Salva em avaliacoes + capturas_imagem + resultados_ia
   Future<void> _salvar() async {
     if (_pacienteSelecionado == null || _laudo == null) return;
 
@@ -338,7 +334,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
           ? 'Sem alterações significativas'
           : 'Alterações posturais identificadas';
 
-      // ── 1. Salva em avaliacoes ───────────────────────────────
       final avaliacaoResponse = await _supabase
           .from('avaliacoes')
           .insert({
@@ -355,7 +350,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
 
       final avaliacaoId = avaliacaoResponse['id'];
 
-      // ── 2. Salva em capturas_imagem ──────────────────────────
       final capturaResponse = await _supabase
           .from('capturas_imagem')
           .insert({
@@ -369,7 +363,6 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
 
       final capturaId = capturaResponse['id'];
 
-      // ── 3. Salva em resultados_ia ────────────────────────────
       if (_coordenadas != null) {
         await _supabase.from('resultados_ia').insert({
           'captura_id': capturaId,
@@ -459,14 +452,21 @@ class _AnaliseScreenState extends State<AnaliseScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // Foto
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.file(
-                      File(widget.imagePath),
-                      height: 250,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
+                  // ✅ Foto ajustada para mostrar o corpo inteiro
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.black12,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.file(
+                        File(widget.imagePath),
+                        height: 450, // ✅ Aumentado de 250 para 450
+                        width: double.infinity,
+                        fit: BoxFit
+                            .contain, // ✅ Mostra a imagem inteira sem cortar
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
