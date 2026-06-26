@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-class DetalheAvaliacaoScreen extends StatelessWidget {
+class DetalheAvaliacaoScreen extends StatefulWidget {
   final Map<String, dynamic> avaliacao;
   final String nomePaciente;
 
@@ -9,6 +10,50 @@ class DetalheAvaliacaoScreen extends StatelessWidget {
     required this.avaliacao,
     required this.nomePaciente,
   });
+
+  @override
+  State<DetalheAvaliacaoScreen> createState() =>
+      _DetalheAvaliacaoScreenState();
+}
+
+class _DetalheAvaliacaoScreenState extends State<DetalheAvaliacaoScreen> {
+  final _supabase = Supabase.instance.client;
+
+  String? _fotoUrlAssinada;
+  bool _isLoadingFoto = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarFoto();
+  }
+
+  // ✅ Gera uma URL temporária e segura para exibir a foto do bucket privado
+  Future<void> _carregarFoto() async {
+    final path = widget.avaliacao['foto_url']?.toString();
+
+    if (path == null || path.isEmpty) {
+      setState(() => _isLoadingFoto = false);
+      return;
+    }
+
+    try {
+      final url = await _supabase.storage
+          .from('fotos-pacientes')
+          .createSignedUrl(path, 3600); // expira em 1 hora
+
+      if (mounted) {
+        setState(() {
+          _fotoUrlAssinada = url;
+          _isLoadingFoto = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingFoto = false);
+      }
+    }
+  }
 
   String _formatarData(String? dataStr) {
     if (dataStr == null) return 'Data desconhecida';
@@ -23,8 +68,9 @@ class DetalheAvaliacaoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final temAlteracoes =
-        avaliacao['conclusao_geral']?.toString().contains('Alterações') ??
+    final temAlteracoes = widget.avaliacao['conclusao_geral']
+            ?.toString()
+            .contains('Alterações') ??
         false;
 
     return Scaffold(
@@ -78,7 +124,7 @@ class DetalheAvaliacaoScreen extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              nomePaciente,
+                              widget.nomePaciente,
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFFE0F2F1),
@@ -97,6 +143,10 @@ class DetalheAvaliacaoScreen extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.all(24),
                   children: [
+                    // ✅ Foto carregada do Storage privado via URL assinada
+                    _buildFoto(),
+                    const SizedBox(height: 16),
+
                     // Card de status
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -128,7 +178,8 @@ class DetalheAvaliacaoScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  avaliacao['conclusao_geral']?.toString() ??
+                                  widget.avaliacao['conclusao_geral']
+                                          ?.toString() ??
                                       'Avaliação',
                                   style: TextStyle(
                                     fontSize: 15,
@@ -140,7 +191,9 @@ class DetalheAvaliacaoScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _formatarData(avaliacao['data_avaliacao']),
+                                  _formatarData(
+                                    widget.avaliacao['data_avaliacao'],
+                                  ),
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[600],
@@ -159,7 +212,7 @@ class DetalheAvaliacaoScreen extends StatelessWidget {
                       title: 'Laudo Completo',
                       icon: Icons.article_outlined,
                       child: Text(
-                        avaliacao['observacoes']?.toString() ??
+                        widget.avaliacao['observacoes']?.toString() ??
                             'Sem observações',
                         style: const TextStyle(
                           fontSize: 13,
@@ -174,6 +227,91 @@ class DetalheAvaliacaoScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ Widget que carrega a foto do Storage privado
+  Widget _buildFoto() {
+    if (_isLoadingFoto) {
+      return Container(
+        height: 300,
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(color: Color(0xFF00897B)),
+        ),
+      );
+    }
+
+    if (_fotoUrlAssinada == null) {
+      return Container(
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.image_not_supported_outlined,
+                  size: 40, color: Colors.grey),
+              SizedBox(height: 8),
+              Text(
+                'Foto não disponível',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.black12,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.network(
+          _fotoUrlAssinada!,
+          height: 350,
+          width: double.infinity,
+          fit: BoxFit.contain,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              height: 350,
+              alignment: Alignment.center,
+              child: const CircularProgressIndicator(
+                color: Color(0xFF00897B),
+              ),
+            );
+          },
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              height: 200,
+              alignment: Alignment.center,
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.broken_image_outlined,
+                      size: 40, color: Colors.grey),
+                  SizedBox(height: 8),
+                  Text(
+                    'Erro ao carregar foto',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
